@@ -55,8 +55,99 @@ module ::MItamae
           end
         end
 
+        # https://github.com/chef-cookbooks/runit/blob/v1.5.8/libraries/provider_runit_service.rb#L156-L173
         def action_enable
-          puts "!!! ENABLE !!!"
+          configure_service # Do this every run, even if service is already enabled and running
+          MItamae.logger.info("#{log_prefix} configured")
+          # if desired.enabled
+          #   MItamae.logger.debug("#{log_prefix} already enabled - nothing to do")
+          # else
+          #   enable_service
+          #   MItamae.logger.info("#{log_prefix} enabled")
+          # end
+          # restart_service if desired.restart_on_update && run_script.updated_by_last_action?
+          # restart_log_service if desired.restart_on_update && log_run_script.updated_by_last_action?
+          # restart_log_service if desired.restart_on_update && log_config_file.updated_by_last_action?
+        end
+
+        def configure_service
+          if desired.sv_templates
+            MItamae.logger.debug("Creating sv_dir for #{desired.service_name}")
+            run_child(sv_dir, :create)
+            MItamae.logger.debug("Creating run_script for #{desired.service_name}")
+            run_child(run_script, :create)
+
+            if desired.log
+              MItamae.logger.debug("Setting up svlog for #{desired.service_name}")
+              run_child(log_dir, :create)
+              run_child(log_main_dir, :create)
+              run_child(default_log_dir, :create) if desired.default_logger
+              run_child(log_run_script, :create)
+              run_child(log_config_file, :create)
+            else
+              MItamae.logger.debug("log not specified for #{desired.service_name}, continuing")
+            end
+
+            unless desired.env.empty?
+              MItamae.logger.debug("Setting up environment files for #{desired.service_name}")
+              run_child(env_dir, :create)
+              env_files.each { |file| run_child(file, :create) }
+            else
+              MItamae.logger.debug("Environment not specified for #{desired.service_name}, continuing")
+            end
+
+            if desired.check
+              MItamae.logger.debug("Creating check script for #{desired.service_name}")
+              run_child(check_script, :create)
+            else
+              MItamae.logger.debug("Check script not specified for #{desired.service_name}, continuing")
+            end
+
+            if desired.finish
+              MItamae.logger.debug("Creating finish script for #{desired.service_name}")
+              run_child(finish_script, :create)
+            else
+              MItamae.logger.debug("Finish script not specified for #{desired.service_name}, continuing")
+            end
+
+            unless desired.control.empty?
+              MItamae.logger.debug("Creating control signal scripts for #{desired.service_name}")
+              run_child(control_dir, :create)
+              control_signal_files.each { |file| run_child(file, :create) }
+            else
+              MItamae.logger.debug("Control signals not specified for #{desired.service_name}, continuing")
+            end
+          end
+
+          MItamae.logger.debug("Creating lsb_init compatible interface #{desired.service_name}")
+          run_child(lsb_init, :create)
+        end
+
+        def enable_service
+          # MItamae.logger.debug("Creating symlink in service_dir for #{desired.service_name}")
+          # service_link.run_action(:create)
+
+          # MItamae.logger.debug("waiting until named pipe #{service_dir_name}/supervise/ok exists.")
+          # until ::FileTest.pipe?("#{service_dir_name}/supervise/ok")
+          #   sleep 1
+          #   MItamae.logger.debug('.')
+          # end
+
+          # if desired.log
+          #   MItamae.logger.debug("waiting until named pipe #{service_dir_name}/log/supervise/ok exists.")
+          #   until ::FileTest.pipe?("#{service_dir_name}/log/supervise/ok")
+          #     sleep 1
+          #     MItamae.logger.debug('.')
+          #   end
+          # end
+        end
+
+        def restart_service
+          # shell_out!("#{desired.sv_bin} #{sv_args}restart #{service_dir_name}")
+        end
+
+        def restart_log_service
+          # shell_out!("#{desired.sv_bin} #{sv_args}restart #{service_dir_name}/log")
         end
 
         # https://github.com/chef-cookbooks/runit/blob/v1.5.8/libraries/provider_runit_service.rb#L212-L218
@@ -79,6 +170,10 @@ module ::MItamae
           (cmd.stdout =~ /^run:/ && cmd.exit_status == 0)
         end
 
+        def sv_dir_name
+          ::File.join(desired.sv_dir, desired.service_name)
+        end
+
         def sv_args
           sv_args = ''
           sv_args += "-w '#{desired.sv_timeout}' " unless desired.sv_timeout.nil?
@@ -92,6 +187,232 @@ module ::MItamae
 
         def log_prefix
           "runit_service[#{desired.service_name}]"
+        end
+
+        def default_logger_content
+          "#!/bin/sh
+exec svlogd -tt /var/log/#{desired.service_name}"
+        end
+
+        #
+        # Helper Resources
+        #
+        def sv_dir
+          @sv_dir ||= with_new_recipe do |recipe|
+            MItamae::Resource::Directory.new(sv_dir_name, recipe, desired: desired) do
+              owner desired.owner
+              group desired.group
+              mode '755'
+            end
+          end
+        end
+
+        def run_script
+          @run_script ||= with_new_recipe do |recipe|
+            MItamae::Resource::Template.new(::File.join(sv_dir_name, 'run'), recipe, desired: desired) do
+              owner desired.owner
+              group desired.group
+              source ::File.expand_path("sv-#{desired.run_template_name}-run.erb", desired.templates_dir)
+              mode '755'
+              variables(options: desired.options)
+            end
+          end
+        end
+
+        def log_dir
+          @log_dir ||= with_new_recipe do |recipe|
+            MItamae::Resource::Directory.new(::File.join(sv_dir_name, 'log'), recipe, desired: desired) do
+              owner desired.owner
+              group desired.group
+              mode '755'
+            end
+          end
+        end
+
+        def log_main_dir
+          @log_main_dir ||= with_new_recipe do |recipe|
+            MItamae::Resource::Directory.new(::File.join(sv_dir_name, 'log', 'main'), recipe, desired: desired) do
+              owner desired.woner
+              group desired.group
+              mode '755'
+            end
+          end
+        end
+
+        def default_log_dir
+          @default_log_dir ||= with_new_recipe do |recipe|
+            MItamae::Resource::Directory.new(::File.join("/var/log/#{desired.service_name}"), recipe, desired: desired) do
+              owner desired.owner
+              group desired.group
+              mode '755'
+            end
+          end
+        end
+
+        def log_run_script
+          return @log_run_script unless @log_run_script.nil?
+          if desired.default_logger
+            @log_run_script = with_new_recipe do |recipe|
+              MItamae::Resource::File.new(::File.join(sv_dir_name, 'log', 'run'), recipe, desired: desired, default_logger_content: default_logger_content) do
+                content default_logger_content
+                owner desired.owner
+                group desired.group
+                mode '755'
+              end
+            end
+          else
+            @log_run_script = with_new_recipe do |recipe|
+              MItamae::Resource::Template.new(::File.join(sv_dir_name, 'log', 'run'), recipe, desired: desired) do
+                owner desired.owner
+                group desired.group
+                mode '755'
+                source ::File.expand_path("sv-#{desired.run_template_name}-log-run.erb", desired.templates_dir)
+                variables(options: desired.options)
+              end
+            end
+          end
+        end
+
+        def log_config_file
+          @log_config_file ||= with_new_recipe do |recipe|
+            MItamae::Resource::Template.new(::File.join(sv_dir_name, 'log', 'config'), recipe, desired: desired, __dir__: __dir__) do
+              owner desired.owner
+              group desired.group
+              mode '644'
+              source ::File.expand_path('templates/log-config.erb', __dir__)
+              variables(
+                size: desired.log_size,
+                num: desired.log_num,
+                min: desired.log_min,
+                timeout: desired.log_timeout,
+                processor: desired.log_processor,
+                socket: desired.log_socket,
+                prefix: desired.log_prefix,
+                append: desired.log_config_append
+              )
+            end
+          end
+        end
+
+        def env_dir
+          @env_dir ||= with_new_recipe do |recipe|
+            MItamae::Resource::Directory.new(::File.join(sv_dir_name, 'env'), recipe, desired: desired) do
+              owner desired.owner
+              group desired.group
+              mode '755'
+            end
+          end
+        end
+
+        def env_files
+          @env_files ||= with_new_recipe do |recipe|
+            desired.env.map do |var, value|
+              MItamae::Resource::File.new(::File.join(sv_dir_name, 'env', var), recipe, desired: desired) do
+                owner desired.owner
+                group desired.group
+                content value
+              end
+            end
+          end
+        end
+
+        def check_script
+          @check_script ||= with_new_recipe do |recipe|
+            MItamae::Resource::Template.new(::File.join(sv_dir_name, 'check'), recipe, desired: desired) do
+              owner desired.owner
+              gropu desired.group
+              source ::File.expand_path("sv-#{desired.run_template_name}-check.erb", desired.templates_dir)
+              mode '755'
+              variables(options: desired.options)
+            end
+          end
+        end
+
+        def finish_script
+          @finish_script ||= with_new_recipe do |recipe|
+            MItamae::Resource::Template.new(::File.join(sv_dir_name, 'finish'), recipe, desired: desired) do
+              owner desired.owner
+              gropu desired.group
+              mode '755'
+              source ::File.expand_path("sv-#{desired.run_template_name}-finish.erb", desired.templates_dir)
+              variables(options: desired.options)
+            end
+          end
+        end
+
+        def control_dir
+          @control_dir ||= with_new_recipe do |recipe|
+            MItamae::Resource::Directory.new(::File.join(sv_dir_name, 'control'), recipe, desired: desired) do
+              owner desired.owner
+              group desired.group
+              mode '755'
+            end
+          end
+        end
+
+        def control_signal_files
+          @control_signal_files ||= with_new_recipe do |recipe|
+            desired.control.map do |signal|
+              MItamae::Resource::Template.new(::File.join(sv_dir_name, 'control', signal), recipe, desired: desired) do
+                owner desired.owner
+                group desired.group
+                mode '755'
+                source ::File.expand_path("sv-#{desired.control_template_names[signal]}-check.erb", desired.templates_dir)
+                variables(options: options)
+              end
+            end
+          end
+        end
+
+        def lsb_init
+          return @lsb_init unless @lsb_init.nil?
+          initfile = ::File.join(desired.lsb_init_dir, desired.service_name)
+          if node[:platform] == 'debian'
+            ::File.unlink(initfile) if ::File.symlink?(initfile)
+            @lsb_init = with_new_recipe do |recipe|
+              MItamae::Resource::Template.new(initfile, recipe, desired: desired, __dir__: __dir__) do
+                owner 'root'
+                group 'root'
+                mode '755'
+                source ::File.expand_path('templates/init.d.erb', __dir__)
+                variables(name: desired.service_name)
+              end
+            end
+          else
+            @lsb_init = with_new_recipe do |recipe|
+              MItamae::Resource::Link.new(initfile, recipe, desired: desired) do
+                to desired.sv_bin
+              end
+            end
+          end
+          @lsb_init
+        end
+
+        #
+        # MItamae Helpers
+        #
+        def with_new_recipe(&block)
+          new_recipe = MItamae::Recipe.new(@resource.recipe.path, @resource.recipe)
+          block.call(new_recipe).tap do |result|
+            new_recipe.children << result
+          end
+        end
+
+        def run_child(resource, action)
+          ::MItamae::ResourceExecutor.create(resource, @runner).execute(action)
+        end
+
+        # __FILE__ is "(eval)". This is workaround to find template.
+        def __dir__
+          # MItamae plugin is only searched from relative "./plugins".
+          "./plugins/mitamae-plugin-resource-runit_service/mrblib/resource_executor/"
+        end
+
+        # Workaround hack...
+        def node
+          @node ||= MItamae::RecipeLoader.new(
+            backend: @runner.instance_variable_get(:@backend),
+          ).instance_variable_get(:@node)
         end
       end
     end
