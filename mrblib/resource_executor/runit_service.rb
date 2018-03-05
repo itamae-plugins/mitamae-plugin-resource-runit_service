@@ -8,6 +8,9 @@ module ::MItamae
         # and called at https://github.com/itamae-kitchen/mitamae/blob/v1.5.6/mrblib/mitamae/resource_executor/base.rb#L85
         # to reflect `desired` states which are not met in `current`.
         def apply
+          if desired.termed
+            action_term
+          end
           if desired.enabled
             action_enable
           end
@@ -33,6 +36,8 @@ module ::MItamae
             desired.enabled = true
           when :hup
             desired.hupped = true
+          when :term
+            desired.termed = true
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
           end
@@ -49,6 +54,9 @@ module ::MItamae
             current.enabled = enabled?
           when :hup
             current.hupped = false
+            current.running = running?
+          when :term
+            current.termed = false
             current.running = running?
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
@@ -154,6 +162,15 @@ module ::MItamae
         def action_hup
           if current.running
             runit_send_signal(:hup)
+          else
+            MItamae.logger.debug("#{log_prefix} not running - nothing to do")
+          end
+        end
+
+        # https://github.com/chef-cookbooks/runit/blob/v1.5.8/libraries/provider_runit_service.rb#L212-L218
+        def action_term
+          if current.running
+            runit_send_signal(:term)
           else
             MItamae.logger.debug("#{log_prefix} not running - nothing to do")
           end
