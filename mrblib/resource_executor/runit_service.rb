@@ -46,7 +46,7 @@ module ::MItamae
         def set_current_attributes(current, action)
           case action
           when :enable
-            current.enabled = false
+            current.enabled = enabled?
           when :hup
             current.hupped = false
             current.running = running?
@@ -59,15 +59,15 @@ module ::MItamae
         def action_enable
           configure_service # Do this every run, even if service is already enabled and running
           MItamae.logger.info("#{log_prefix} configured")
-          # if desired.enabled
-          #   MItamae.logger.debug("#{log_prefix} already enabled - nothing to do")
-          # else
-          #   enable_service
-          #   MItamae.logger.info("#{log_prefix} enabled")
-          # end
-          # restart_service if desired.restart_on_update && run_script.updated_by_last_action?
-          # restart_log_service if desired.restart_on_update && log_run_script.updated_by_last_action?
-          # restart_log_service if desired.restart_on_update && log_config_file.updated_by_last_action?
+          if current.enabled
+            MItamae.logger.debug("#{log_prefix} already enabled - nothing to do")
+          else
+            enable_service
+            MItamae.logger.info("#{log_prefix} enabled")
+          end
+          restart_service if desired.restart_on_update && run_script.updated_by_last_action?
+          restart_log_service if desired.restart_on_update && log_run_script.updated_by_last_action?
+          restart_log_service if desired.restart_on_update && log_config_file.updated_by_last_action?
         end
 
         def configure_service
@@ -124,30 +124,30 @@ module ::MItamae
         end
 
         def enable_service
-          # MItamae.logger.debug("Creating symlink in service_dir for #{desired.service_name}")
-          # service_link.run_action(:create)
+          MItamae.logger.debug("Creating symlink in service_dir for #{desired.service_name}")
+          run_child(service_link, :create)
 
-          # MItamae.logger.debug("waiting until named pipe #{service_dir_name}/supervise/ok exists.")
-          # until ::FileTest.pipe?("#{service_dir_name}/supervise/ok")
-          #   sleep 1
-          #   MItamae.logger.debug('.')
-          # end
+          MItamae.logger.debug("waiting until named pipe #{service_dir_name}/supervise/ok exists.")
+          until ::FileTest.pipe?("#{service_dir_name}/supervise/ok")
+            sleep 1
+            MItamae.logger.debug('.')
+          end
 
-          # if desired.log
-          #   MItamae.logger.debug("waiting until named pipe #{service_dir_name}/log/supervise/ok exists.")
-          #   until ::FileTest.pipe?("#{service_dir_name}/log/supervise/ok")
-          #     sleep 1
-          #     MItamae.logger.debug('.')
-          #   end
-          # end
+          if desired.log
+            MItamae.logger.debug("waiting until named pipe #{service_dir_name}/log/supervise/ok exists.")
+            until ::FileTest.pipe?("#{service_dir_name}/log/supervise/ok")
+              sleep 1
+              MItamae.logger.debug('.')
+            end
+          end
         end
 
         def restart_service
-          # shell_out!("#{desired.sv_bin} #{sv_args}restart #{service_dir_name}")
+          @runner.run_command("#{desired.sv_bin} #{sv_args}restart #{service_dir_name}")
         end
 
         def restart_log_service
-          # shell_out!("#{desired.sv_bin} #{sv_args}restart #{service_dir_name}/log")
+          @runner.run_command("#{desired.sv_bin} #{sv_args}restart #{service_dir_name}/log")
         end
 
         # https://github.com/chef-cookbooks/runit/blob/v1.5.8/libraries/provider_runit_service.rb#L212-L218
@@ -168,6 +168,10 @@ module ::MItamae
         def running?
           cmd = @runner.run_command("#{desired.sv_bin} #{sv_args}status #{service_dir_name}", error: false)
           (cmd.stdout =~ /^run:/ && cmd.exit_status == 0)
+        end
+
+        def enabled?
+          ::File.exists?(::File.join(service_dir_name, 'run'))
         end
 
         def sv_dir_name
@@ -388,6 +392,14 @@ exec svlogd -tt /var/log/#{desired.service_name}"
           @lsb_init
         end
 
+        def service_link
+          @service_link ||= with_new_recipe do |recipe|
+            MItamae::Resource::Link.new(::File.join(service_dir_name), recipe, sv_dir_name: sv_dir_name) do
+              to sv_dir_name
+            end
+          end
+        end
+
         #
         # MItamae Helpers
         #
@@ -399,7 +411,13 @@ exec svlogd -tt /var/log/#{desired.service_name}"
         end
 
         def run_child(resource, action)
-          ::MItamae::ResourceExecutor.create(resource, @runner).execute(action)
+          executor = ::MItamae::ResourceExecutor.create(resource, @runner)
+          executor.execute(action)
+          if executor.send(:updated?) # hack...
+            def resource.updated_by_last_action?; true; end
+          else
+            def resource.updated_by_last_action?; false; end
+          end
         end
 
         # __FILE__ is "(eval)". This is workaround to find template.
