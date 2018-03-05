@@ -1,6 +1,6 @@
 # mitamae-plugin-resource-runit\_service
 
-MItamae plugin to reproduce the behavior of https://github.com/chef-cookbooks/runit v1.7.8
+MItamae plugin to reproduce the behavior of https://github.com/chef-cookbooks/runit ~v1.7.8~ v1.5.8
 
 ## Usage
 
