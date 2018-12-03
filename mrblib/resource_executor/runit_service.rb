@@ -17,6 +17,9 @@ module ::MItamae
           if desired.hupped
             action_hup
           end
+          if desired.restarted
+            action_restart
+          end
         end
 
         private
@@ -38,6 +41,8 @@ module ::MItamae
             desired.hupped = true
           when :term
             desired.termed = true
+          when :restart
+            desired.restarted = true
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
           end
@@ -58,9 +63,17 @@ module ::MItamae
           when :term
             current.termed = false
             current.running = running?
+          when :restarted
+            current.restarted = false
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
           end
+        end
+
+        # https://github.com/chef/chef/blob/v12.13.37/lib/chef/provider/service.rb#L165-L172
+        def action_restart
+          restart_service
+          MItamae.logger.info("#{log_prefix} restarted")
         end
 
         # https://github.com/chef-cookbooks/runit/blob/v1.5.8/libraries/provider_runit_service.rb#L156-L173

@@ -34,7 +34,7 @@ module ::MItamae
         define_attribute :control_template_names, type: Hash, default: {}
         define_attribute :lsb_init_dir, type: String, default: '/etc/init.d'
 
-        self.available_actions = [:enable, :hup, :term]
+        self.available_actions = [:enable, :hup, :term, :restart]
 
         private
 
