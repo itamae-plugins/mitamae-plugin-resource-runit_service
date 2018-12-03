@@ -445,9 +445,7 @@ exec svlogd -tt /var/log/#{desired.service_name}"
 
         # Workaround hack...
         def node
-          @node ||= MItamae::RecipeLoader.new(
-            backend: @runner.instance_variable_get(:@backend),
-          ).instance_variable_get(:@node)
+          @node ||= MItamae::Node.new({}, @runner.instance_variable_get(:@backend))
         end
       end
     end
