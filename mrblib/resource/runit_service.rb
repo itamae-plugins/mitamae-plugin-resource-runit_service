@@ -12,6 +12,7 @@ module ::MItamae
         define_attribute :log_size, type: Integer
         define_attribute :log_num, type: Integer
         define_attribute :templates_dir, type: String, required: true
+        define_attribute :restart_on_update, type: [TrueClass, FalseClass], default: true
 
         define_attribute :sv_bin, type: String, default: '/usr/bin/sv'
         define_attribute :sv_dir, type: String, default: '/etc/sv'
