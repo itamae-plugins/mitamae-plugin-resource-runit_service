@@ -63,7 +63,7 @@ module ::MItamae
           when :term
             current.termed = false
             current.running = running?
-          when :restarted
+          when :restart
             current.restarted = false
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
