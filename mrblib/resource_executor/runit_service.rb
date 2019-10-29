@@ -43,6 +43,8 @@ module ::MItamae
             desired.termed = true
           when :restart
             desired.restarted = true
+          when :nothing
+            # nothing
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
           end
@@ -65,6 +67,8 @@ module ::MItamae
             current.running = running?
           when :restart
             current.restarted = false
+          when :nothing
+            # nothing
           else
             raise NotImplementedError, "unhandled action: '#{action}'"
           end
