@@ -304,7 +304,7 @@ exec svlogd -tt /var/log/#{desired.service_name}"
                 owner desired.owner
                 group desired.group
                 mode '755'
-                source ::File.expand_path("sv-#{desired.run_template_name}-log-run.erb", desired.templates_dir)
+                source ::File.expand_path("sv-#{desired.log_template_name}-log-run.erb", desired.templates_dir)
                 variables(options: desired.options)
               end
             end
@@ -359,7 +359,7 @@ exec svlogd -tt /var/log/#{desired.service_name}"
             MItamae::Resource::Template.new(::File.join(sv_dir_name, 'check'), recipe, desired: desired) do
               owner desired.owner
               gropu desired.group
-              source ::File.expand_path("sv-#{desired.run_template_name}-check.erb", desired.templates_dir)
+              source ::File.expand_path("sv-#{desired.check_script_template_name}-check.erb", desired.templates_dir)
               mode '755'
               variables(options: desired.options)
             end
@@ -372,7 +372,7 @@ exec svlogd -tt /var/log/#{desired.service_name}"
               owner desired.owner
               gropu desired.group
               mode '755'
-              source ::File.expand_path("sv-#{desired.run_template_name}-finish.erb", desired.templates_dir)
+              source ::File.expand_path("sv-#{desired.finish_script_template_name}-finish.erb", desired.templates_dir)
               variables(options: desired.options)
             end
           end

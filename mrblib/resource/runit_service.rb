@@ -21,6 +21,9 @@ module ::MItamae
         define_attribute :sv_templates, type: [TrueClass, FalseClass], default: true
         define_attribute :service_dir, type: String, default: '/etc/service'
         define_attribute :run_template_name, type: String
+        define_attribute :log_template_name, type: String
+        define_attribute :check_script_template_name, type: String
+        define_attribute :finish_script_template_name, type: String
         define_attribute :log, type: [TrueClass, FalseClass], default: true
         define_attribute :log_min, type: Integer
         define_attribute :log_timeout, type: Integer
@@ -44,6 +47,15 @@ module ::MItamae
           # Depends on :default_name of service_name
           unless @attributes.key?(:run_template_name)
             @attributes[:run_template_name] = @attributes.fetch(:service_name)
+          end
+          unless @attributes.key?(:log_template_name)
+            @attributes[:log_template_name] = @attributes.fetch(:service_name)
+          end
+          unless @attributes.key?(:check_script_template_name)
+            @attributes[:check_script_template_name] = @attributes.fetch(:service_name)
+          end
+          unless @attributes.key?(:finish_script_template_name)
+            @attributes[:finish_script_template_name] = @attributes.fetch(:service_name)
           end
 
           # Depends on :default of sv_dir
