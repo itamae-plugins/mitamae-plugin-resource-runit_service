@@ -67,7 +67,7 @@ module ::MItamae
           when :hup
             current.hupped = false
             current.running = running?
-          when :hup
+          when :int
             current.inted = false
             current.running = running?
           when :term
