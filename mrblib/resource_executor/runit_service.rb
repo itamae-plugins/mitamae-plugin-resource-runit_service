@@ -17,6 +17,9 @@ module ::MItamae
           if desired.hupped
             action_hup
           end
+          if desired.inted
+            action_int
+          end
           if desired.restarted
             action_restart
           end
@@ -39,6 +42,8 @@ module ::MItamae
             desired.enabled = true
           when :hup
             desired.hupped = true
+          when :int
+            desired.inted = true
           when :term
             desired.termed = true
           when :restart
@@ -61,6 +66,9 @@ module ::MItamae
             current.enabled = enabled?
           when :hup
             current.hupped = false
+            current.running = running?
+          when :hup
+            current.inted = false
             current.running = running?
           when :term
             current.termed = false
@@ -179,6 +187,15 @@ module ::MItamae
         def action_hup
           if current.running
             runit_send_signal(:hup)
+          else
+            MItamae.logger.debug("#{log_prefix} not running - nothing to do")
+          end
+        end
+
+        # https://github.com/chef-cookbooks/runit/blob/v1.5.8/libraries/provider_runit_service.rb#L212-L218
+        def action_int
+          if current.running
+            runit_send_signal(:int)
           else
             MItamae.logger.debug("#{log_prefix} not running - nothing to do")
           end
