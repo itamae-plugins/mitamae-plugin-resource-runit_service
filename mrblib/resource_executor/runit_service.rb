@@ -159,6 +159,7 @@ module ::MItamae
         def enable_service
           MItamae.logger.debug("Creating symlink in service_dir for #{desired.service_name}")
           run_child(service_link, :create)
+          run_child(log_config_link, :create)
 
           MItamae.logger.debug("waiting until named pipe #{service_dir_name}/supervise/ok exists.")
           until ::FileTest.pipe?("#{service_dir_name}/supervise/ok")
@@ -447,6 +448,14 @@ exec svlogd -tt /var/log/#{desired.service_name}"
           @service_link ||= with_new_recipe do |recipe|
             MItamae::Resource::Link.new(::File.join(service_dir_name), recipe, sv_dir_name: sv_dir_name) do
               to sv_dir_name
+            end
+          end
+        end
+
+        def log_config_link
+          @log_config_link ||= with_new_recipe do |recipe|
+            MItamae::Resource::Link.new(::File.join(log_main_dir, 'config'), recipe, log_config_file: log_config_file) do
+              to log_config_file
             end
           end
         end
