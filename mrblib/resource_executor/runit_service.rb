@@ -117,6 +117,7 @@ module ::MItamae
               run_child(default_log_dir, :create) if desired.default_logger
               run_child(log_run_script, :create)
               run_child(log_config_file, :create)
+              run_child(log_config_link, :create)
             else
               MItamae.logger.debug("log not specified for #{desired.service_name}, continuing")
             end
@@ -159,7 +160,6 @@ module ::MItamae
         def enable_service
           MItamae.logger.debug("Creating symlink in service_dir for #{desired.service_name}")
           run_child(service_link, :create)
-          run_child(log_config_link, :create)
 
           MItamae.logger.debug("waiting until named pipe #{service_dir_name}/supervise/ok exists.")
           until ::FileTest.pipe?("#{service_dir_name}/supervise/ok")
