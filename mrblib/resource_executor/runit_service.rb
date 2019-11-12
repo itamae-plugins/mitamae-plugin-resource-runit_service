@@ -454,8 +454,8 @@ exec svlogd -tt /var/log/#{desired.service_name}"
 
         def log_config_link
           @log_config_link ||= with_new_recipe do |recipe|
-            MItamae::Resource::Link.new(::File.join(log_main_dir, 'config'), recipe, log_config_file: log_config_file) do
-              to log_config_file
+            MItamae::Resource::Link.new(::File.join(log_main_dir.resource_name, 'config'), recipe, log_config_file: log_config_file) do
+              to log_config_file.resource_name
             end
           end
         end
