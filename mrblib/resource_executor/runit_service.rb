@@ -480,10 +480,9 @@ exec svlogd -tt /var/log/#{desired.service_name}"
           end
         end
 
-        # __FILE__ is "(eval)". This is workaround to find template.
+        # __dir__ is not defined in mruby by default
         def __dir__
-          # MItamae plugin is only searched from relative "./plugins".
-          "./plugins/mitamae-plugin-resource-runit_service/mrblib/resource_executor/"
+          File.expand_path('..', __FILE__)
         end
 
         # Workaround hack...
